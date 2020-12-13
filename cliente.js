@@ -20,6 +20,7 @@ const UNIRSE_GRUPO = "group";
 const TOPICO_HB = "heartbeat";
 const TOPICO_ALL = "message/all";
 const PREFIJO_TOPICO = "message/";
+const PREFIJO_GRUPO = "g_";
 
 const socketAll = zmq.socket('sub'), socketHeartbeat = zmq.socket('sub'), socketCliente = zmq.socket('sub');
 
@@ -80,13 +81,12 @@ async function arranque() {
                 "ip": respuesta.resultados.datosBroker[0].ip,
                 "puerto": respuesta.resultados.datosBroker[0].puerto
             });
+            emitirHeartbeat();
             setInterval(emitirHeartbeat, configCliente.periodoHeartbeat);
         }
         mediador.pedirAlCoord(request, callback);
     }
-    else {
-        //hay que ver si se agrega algun error que pueda llegar aca.
-    }
+
     
 }
 
@@ -127,7 +127,7 @@ rl.on('line', function (comando) {
         else
         if (comandoAct[0] === UNIRSE_GRUPO) {
             if (comandoAct.length === 2) {
-                grupo(comandoAct[1]);
+                grupo(PREFIJO_GRUPO + comandoAct[1]);
             }
             else {
                 logearError("Cantidad invalida de argumentos");
@@ -143,17 +143,13 @@ rl.on('line', function (comando) {
 });
 
 function cerrar() {
-
     rl.close();
-
     socketAll.close();
     socketHeartbeat.close();
     socketCliente.close();
-
-    Array.from(listaSockets.values()).forEach((socket) => { socket.close() });
-
+    Array.from(listaSockets.values()).forEach((socket) => { socket.close(); });
     logearTexto(`Hasta luego ${ID_CLIENTE}!`);
-    //process.exit(); // con esto funciona, pero seria mas prolijo lograr que los socket se cierren naturalmente
+    process.exit();
 }
 
 function logearError(mensaje) {
@@ -176,7 +172,7 @@ function preguntar(pregunta) {
 }
 
 async function writeGroup(comandoAct) {
-    const topico = comandoAct[1];
+    const topico = PREFIJO_GRUPO + comandoAct[1];
 
     if (listaSockets.has(topico)) {
         let mensaje = await preguntar("Mensaje: ");
@@ -316,7 +312,7 @@ function recibirMensaje(topico, mensajeJSON) {
     const mensaje = JSON.parse(mensajeJSON);
     if (mensaje.emisor != ID_CLIENTE) {
         almacenMensajes.almacenarMensaje(topico, mensaje);
-        logearTexto("[" + topico + " | " + mensaje.emisor + " | " + mensaje.fecha + " | " + mensaje.mensaje + "]"); //quiza convenga recortar un poco la fecha
+        console.log("\x1b[32m", "[" + topico + " | " + mensaje.emisor + " | " + mensaje.fecha + " | " + mensaje.mensaje + "]" ,"\x1b[0m")
     }
 }
 
@@ -327,7 +323,7 @@ function recibirHB(topico, mensaje) {
 }
 
 function emitirHeartbeat() {
-
+    
     const msjHB = {
         "emisor": ID_CLIENTE,
         "fecha": new Date(reloj.solicitarTiempo()).toISOString()
